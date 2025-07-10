@@ -121,7 +121,7 @@ On NixOS, add the following to your configuration:
 
 let
   modetc = import (pkgs.fetchzip {
-    url = "https://maxwell.eurofusion.eu/git/rnhmjoj/modetc/archive/v0.1.0.zip";
+    url = "https://maxwell.eurofusion.eu/git/rnhmjoj/modetc/archive/v0.1.1.zip";
     sha256 = lib.fakeHash;  # change this
   }) { inherit pkgs; linux = config.boot.kernelPackages; };
 in

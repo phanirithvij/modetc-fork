@@ -6,7 +6,7 @@ rec {
 
 module = pkgs.stdenv.mkDerivation {
   name = "modetc";
-  version = "0.1";
+  version = builtins.readFile ./.version;
   src = builtins.filterSource (path: type:
     baseNameOf path == "modetc.c" ||
     baseNameOf path == "Makefile"
