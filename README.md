@@ -59,7 +59,6 @@ Note: the maximum number of rules supported is 16.
 var/lib/recently-used.xbel	var/cache/recently-used
 etc/Trolltech.conf	var/cache/qt/cache
 etc/QtProject.conf	var/cache/qt/conf
-var/cache/qt/	var/cache/qt/
 etc/matplotlib/	var/cache/matplotlib/
 
 # Generic rewrites
