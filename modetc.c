@@ -230,7 +230,7 @@ static char *get_cwd_path(char *buf, size_t len) {
  * Overwrites a filepath in buffer of fixed size EMBEDDED_NAME_MAX
  * following the given rewriting rules
  */
-static int do_rewrite(const char *caller, struct filename *fname) {
+static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
   // Skip if any error occurred
   if (IS_ERR(fname)) {
     pr_err("getname failed, err=%ld\n", PTR_ERR(fname));
@@ -246,6 +246,9 @@ static int do_rewrite(const char *caller, struct filename *fname) {
 
   // Handle relative paths
   if (unlikely(cursor[0] != '/')) {
+    // TODO: handle these, for now skip
+    if (dfd != AT_FDCWD) return 0;
+
     // Get the cwd
     char buf[EMBEDDED_NAME_MAX];
 
@@ -320,36 +323,43 @@ static int do_rewrite(const char *caller, struct filename *fname) {
 
 static int handle_filename0(struct kprobe *kp, struct pt_regs *regs)
 {
-  struct filename *a = (struct filename *)regs_get_kernel_argument(regs, 0);
-  return do_rewrite(kp->symbol_name, a);
+  int dfd = (int)regs_get_kernel_argument(regs, 1);
+  struct filename *f = (struct filename *)regs_get_kernel_argument(regs, 0);
+  return do_rewrite(kp->symbol_name, dfd, f);
 }
 
 static int handle_filename1(struct kprobe *kp, struct pt_regs *regs)
 {
-  struct filename *a = (struct filename *)regs_get_kernel_argument(regs, 1);
-  return do_rewrite(kp->symbol_name, a);
+  int dfd = (int)regs_get_kernel_argument(regs, 0);
+  struct filename *f = (struct filename *)regs_get_kernel_argument(regs, 1);
+  return do_rewrite(kp->symbol_name, dfd, f);
 }
 
-static int handle_filename13(struct kprobe *kp, struct pt_regs *regs)
+static int handle_filename2(struct kprobe *kp, struct pt_regs *regs)
 {
-  struct filename *a = (struct filename *)regs_get_kernel_argument(regs, 1);
-  struct filename *b = (struct filename *)regs_get_kernel_argument(regs, 3);
-  do_rewrite(kp->symbol_name, a);
-  return do_rewrite(kp->symbol_name, b);
+  int dfda = (int)regs_get_kernel_argument(regs, 0);
+  struct filename *fa = (struct filename *)regs_get_kernel_argument(regs, 1);
+  do_rewrite(kp->symbol_name, dfda, fa);
+
+  int dfdb = (int)regs_get_kernel_argument(regs, 2);
+  struct filename *fb = (struct filename *)regs_get_kernel_argument(regs, 3);
+  do_rewrite(kp->symbol_name, dfdb, fb);
+
+  return 0;
 }
 
 
 /* All kprobes used to intercept and rewrite filenames */
 static struct kprobe probes[] =
 {
-  { .symbol_name="do_unlinkat",       .pre_handler=handle_filename1  },
-  { .symbol_name="do_symlinkat",      .pre_handler=handle_filename0  },
-  { .symbol_name="do_rmdir",          .pre_handler=handle_filename1  },
-  { .symbol_name="do_renameat2",      .pre_handler=handle_filename13 },
-  { .symbol_name="do_filp_open",      .pre_handler=handle_filename1  },
-  { .symbol_name="vfs_statx",         .pre_handler=handle_filename1  },
-  { .symbol_name="filename_create",   .pre_handler=handle_filename1  },
-  { .symbol_name="filename_lookup",   .pre_handler=handle_filename1  },
+  { .symbol_name="do_unlinkat",     .pre_handler=handle_filename1 },
+  { .symbol_name="do_symlinkat",    .pre_handler=handle_filename0 },
+  { .symbol_name="do_rmdir",        .pre_handler=handle_filename1 },
+  { .symbol_name="do_renameat2",    .pre_handler=handle_filename2 },
+  { .symbol_name="do_filp_open",    .pre_handler=handle_filename1 },
+  { .symbol_name="vfs_statx",       .pre_handler=handle_filename1 },
+  { .symbol_name="filename_create", .pre_handler=handle_filename1 },
+  { .symbol_name="filename_lookup", .pre_handler=handle_filename1 },
 };
 
 /* Registers and kprobe while logging any error */
