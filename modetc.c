@@ -310,7 +310,7 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
     // Overwrite original filename
     if (debug) pr_info("[%s] rewriting %s -> %s\n",
                        caller, fname->name, fname1);
-    memcpy((void *)fname->name, fname1, len);
+    memcpy((void *)fname->name, fname1, len + 1);
   }
 
   return 0;
