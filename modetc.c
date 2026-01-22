@@ -17,6 +17,8 @@
 /* prefix for log messages */
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#define is_fname_end(c) (c == '\0' || c == '/')
+
 /* for kernel module programming */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -275,8 +277,8 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
   if (likely(cursor[0] != '.')) return 0;
 
   // Skip special . and .. directories
-  if (unlikely(cursor[1] == '\0')) return 0;
-  if (unlikely(cursor[1] == '.' && cursor[2] == '\0')) return 0;
+  if (unlikely(is_fname_end(cursor[1]))) return 0;
+  if (unlikely(cursor[1] == '.' && is_fname_end(cursor[2]))) return 0;
 
   if (debug) pr_info("[%s] intercepted path %s\n", caller, fname->name);
 

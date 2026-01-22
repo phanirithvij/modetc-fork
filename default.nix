@@ -30,7 +30,7 @@ module = pkgs.stdenv.mkDerivation {
   };
 };
 
-test = pkgs.nixosTest {
+test = pkgs.testers.nixosTest {
   name = "modetc";
   nodes.machine = { lib, modulesPath, ... }: {
     imports = [
@@ -125,6 +125,14 @@ test = pkgs.nixosTest {
         # absolute under, but not home
         machine.succeed("touch /home/alice/repo/.gitignore")
         machine.fail("dmesg | grep -qF '.gitignore'")
+
+        # specials
+        machine.execute("cd /home/alice; ls ./hello")
+        machine.execute("cd /home/alice; ls ../up")
+        machine.execute("cd /home/alice; ls ../../super")
+        machine.fail("dmesg | grep -qF './hello'")
+        machine.fail("dmesg | grep -qF '../up'")
+        machine.fail("dmesg | grep -qF '../../super'")
 
     with subtest("Filename rewriting is working"):
         # create dirs
