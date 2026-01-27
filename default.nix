@@ -53,6 +53,13 @@ test = pkgs.testers.nixosTest {
       options modetc homedir=/home/alice default_rule=var/lib/ debug=1
     '';
 
+    virtualisation.emptyDiskImages = [ 1 ];
+    virtualisation.fileSystems."/home" = {
+      device = "/dev/vdb";
+      fsType = "ext4";
+      autoFormat = true;
+    };
+
     users.users.alice = {
       isNormalUser = true;
     };
@@ -104,6 +111,9 @@ test = pkgs.testers.nixosTest {
         modetc_logs("13 rules loaded")
 
     with subtest("Filename interception is working"):
+        machine.wait_for_unit("home.mount")
+        machine.succeed("mkdir /home/alice")
+
         # relative
         machine.execute("cd /home/alice; cat .dotfile")
         modetc_logs("[do_filp_open] intercepted path .dotfile")
@@ -242,6 +252,9 @@ test = pkgs.testers.nixosTest {
         machine.execute("nc -lU '/home/alice/.socket' >&2 &")
         machine.wait_until_succeeds("stat /home/alice/var/lib/socket")
         machine.succeed("echo ciao | nc -NU /home/alice/.socket")
+
+    with subtest("Can unmount home directory"):
+        machine.succeed("umount /home")
 
     with subtest("Can unload the module"):
         machine.succeed("rmmod modetc")

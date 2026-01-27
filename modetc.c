@@ -220,10 +220,14 @@ static struct proc_ops modetc_proc_ops =
  *    `d_path` that does the convertion.
  * 3. `d_path` doesn't write at the start of buffer but returns a
  *    pointer to the start or an error.
+ * 4. `get_fs_pwd` increases the reference count of cwd, which
+ *     makes no sense and would block the mount point, so we
+ *     release it immediately with `path_put`.
  */
 static char *get_cwd_path(char *buf, size_t len) {
   struct path cwd;
   get_fs_pwd(current->fs, &cwd);
+  path_put(&cwd);
   return d_path(&cwd, buf, len);
 }
 
@@ -364,7 +368,7 @@ static struct kprobe probes[] =
   { .symbol_name="filename_lookup", .pre_handler=handle_filename1 },
 };
 
-/* Registers and kprobe while logging any error */
+/* Registers a kprobe while logging any error */
 static int add_probe(struct kprobe *kp)
 {
   int ret = register_kprobe(kp);
