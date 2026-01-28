@@ -40,6 +40,9 @@ Rules are tested in the order in which they appear in the rules file and the
 first to match will be applied. If no specific rule matches, the leading `.` of
 the file path will be replaced with the value of `default_rule`.
 
+Note: if `default_rule` is unset or the empty string, dotfiles that don't
+       match any rule will not be rewritten.
+
 The rules file consists of one or more lines with one rule per line of the
 following format
 ```

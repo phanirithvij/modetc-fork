@@ -259,6 +259,23 @@ test = pkgs.testers.nixosTest {
     with subtest("Can unload the module"):
         machine.succeed("rmmod modetc")
         modetc_logs("stopped")
+
+    with subtest("Can reload with different settings"):
+        machine.succeed("rm /etc/modprobe.d/nixos.conf")
+        machine.succeed("modprobe modetc homedir=/home/alice debug=1")
+        modetc_logs("running with no default rule")
+
+    with subtest("No default rule is applied"):
+        machine.succeed("touch /home/alice/.dontchange")
+        machine.succeed("ls -a /home/alice/ | grep -qF '.dontchange'")
+
+    with subtest("Fails to load without homedir"):
+        machine.succeed("rmmod modetc")
+        modetc_logs("stopped")
+
+        machine.fail("modprobe modetc debug=1")
+        modetc_logs("you must set a homedir")
+        machine.fail("lsmod | grep -q modetc")
   '';
 };
 

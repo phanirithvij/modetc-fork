@@ -49,12 +49,13 @@ MODULE_LICENSE("GPL");
 
 /* Module parameters */
 
-static char  *homedir;
+static char *homedir;
 static size_t homedir_len;
 module_param(homedir, charp, 0660);
 MODULE_PARM_DESC(homedir, "Home directory where to rewrite paths");
 
-static char  *default_rule;
+static char *default_rule;
+static int has_default;
 module_param(default_rule, charp, 0660);
 MODULE_PARM_DESC(default_rule, "The default replacement for all dotfiles");
 
@@ -303,7 +304,7 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
   }
 
   // Default rule
-  if (i == nrules) {
+  if (has_default && i == nrules) {
     // Strip leading dot
     cursor += 1;
     len = snprintf((char *)fname1, sizeof(fname1), "%s/%s%s",
@@ -392,7 +393,13 @@ static int __init modetc_init(void)
     pr_info("params: homedir=%s,default_rule=%s,debug=%d,rules_file=%s\n",
             homedir, default_rule, debug, rules_file);
 
+  if (homedir == NULL) {
+    pr_err("you must set a homedir\n");
+    return -EINVAL;
+  }
+
   homedir_len = strlen(homedir);
+  has_default = default_rule != NULL && strlen(default_rule) > 0;
   modetc_proc_entry = proc_create("modetc", 0660, NULL, &modetc_proc_ops);
 
   for (int i = 0; i < ARRAY_SIZE(probes); i++) {
@@ -400,6 +407,7 @@ static int __init modetc_init(void)
   }
 
   if (load_rules() < 0) pr_warn("running with no rules\n");
+  if (!has_default) pr_warn("running with no default rule\n");
 
   pr_info("started\n");
   return 0;
