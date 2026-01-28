@@ -18,7 +18,7 @@ module = pkgs.stdenv.mkDerivation {
   makeFlags = [
     "KERNELRELEASE=${linux.kernel.modDirVersion}"
     "KERNEL_DIR=${linux.kernel.dev}/lib/modules/${linux.kernel.modDirVersion}/build"
-    "INSTALL_MOD_PATH=$(out)/lib/modules/${linux.kernel.modDirVersion}/misc/"
+    "INSTALL_MOD_DIR=$(out)/lib/modules/${linux.kernel.modDirVersion}/misc/"
   ];
 
   meta = with pkgs.lib; {

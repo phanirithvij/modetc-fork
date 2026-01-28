@@ -138,7 +138,12 @@ in
 ```
 This installs modetc, loads it on boot and configures it.
 
-On other distributions, after building the module run `make install`.
+On other distributions, after building the module run
+```
+# make install
+# depmod -a
+```
+The module can now be loaded with `sudo modprobe modetc homedir=...`.
 
 
 ## How it works
