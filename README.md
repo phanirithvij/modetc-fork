@@ -196,7 +196,7 @@ Similarly to both method, modetc is Linux-specific.
 
 ## License
 
-Copyright (C) 2025 Michele Guerini Rocco
+Copyright (C) 2026 Michele Guerini Rocco
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
