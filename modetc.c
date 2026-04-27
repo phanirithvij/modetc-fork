@@ -24,6 +24,9 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
+/* for kernel version macros */
+#include <linux/version.h>
+
 /* for module parameters */
 #include <linux/moduleparam.h>
 
@@ -359,14 +362,22 @@ static int handle_filename2(struct kprobe *kp, struct pt_regs *regs)
 /* All kprobes used to intercept and rewrite filenames */
 static struct kprobe probes[] =
 {
+  { .symbol_name="vfs_statx",       .pre_handler=handle_filename1 },
+  { .symbol_name="filename_create", .pre_handler=handle_filename1 },
+  { .symbol_name="filename_lookup", .pre_handler=handle_filename1 },
+  #if LINUX_VERSION_CODE <= KERNEL_VERSION(7, 0, 0)
   { .symbol_name="do_unlinkat",     .pre_handler=handle_filename1 },
   { .symbol_name="do_symlinkat",    .pre_handler=handle_filename0 },
   { .symbol_name="do_rmdir",        .pre_handler=handle_filename1 },
   { .symbol_name="do_renameat2",    .pre_handler=handle_filename2 },
   { .symbol_name="do_filp_open",    .pre_handler=handle_filename1 },
-  { .symbol_name="vfs_statx",       .pre_handler=handle_filename1 },
-  { .symbol_name="filename_create", .pre_handler=handle_filename1 },
-  { .symbol_name="filename_lookup", .pre_handler=handle_filename1 },
+  #else
+  { .symbol_name="filename_unlinkat",  .pre_handler=handle_filename1 },
+  { .symbol_name="filename_symlinkat", .pre_handler=handle_filename0 },
+  { .symbol_name="filename_rmdir",     .pre_handler=handle_filename1 },
+  { .symbol_name="filename_renameat2", .pre_handler=handle_filename2 },
+  { .symbol_name="do_file_open",       .pre_handler=handle_filename1 },
+  #endif
 };
 
 /* Registers a kprobe while logging any error */

@@ -98,9 +98,17 @@ test = pkgs.testers.nixosTest {
         machine.wait_for_console_text("modetc: " + re.escape(msg))
 
 
+    def modetc_log_matches(regex):
+        """
+        Check that modetc emits a message that matches `regex`
+        """
+        machine.wait_for_console_text("modetc: " + regex)
+
+
     machine.start()
     with subtest("Module is loaded successfully"):
         modetc_logs("started")
+        machine.fail("dmesg | grep -q 'failed to register .* kprobe'")
 
     with subtest("Procfs interface is working"):
         machine.succeed("grep '# modetc commands' /proc/modetc >&2")
@@ -116,7 +124,7 @@ test = pkgs.testers.nixosTest {
 
         # relative
         machine.execute("cd /home/alice; cat .dotfile")
-        modetc_logs("[do_filp_open] intercepted path .dotfile")
+        modetc_log_matches("\[do_fil._open\] intercepted path \.dotfile")
 
         # absolute
         machine.execute("stat /home/alice/.another")
@@ -151,24 +159,24 @@ test = pkgs.testers.nixosTest {
 
         # specific rule
         machine.execute("echo test1 > /home/alice/.Xresources")
-        modetc_logs(
-          "[do_filp_open] rewriting /home/alice/.Xresources "
+        modetc_log_matches(
+          "\[do_fil._open\] rewriting /home/alice/\.Xresources "
           "-> /home/alice/etc/x/resources"
         )
         machine.succeed("grep test1 /home/alice/etc/x/resources")
 
         # another rule
         machine.execute("echo test2 > /home/alice/.Xauthority")
-        modetc_logs(
-          "[do_filp_open] rewriting /home/alice/.Xauthority -> "
+        modetc_log_matches(
+          "\[do_fil._open\] rewriting /home/alice/.Xauthority -> "
           "/home/alice/var/cache/x/authority"
         )
         machine.succeed("grep test2 /home/alice/var/cache/x/authority")
 
         # default rule
         machine.succeed("cd /home/alice; touch .history")
-        modetc_logs(
-          "[do_filp_open] rewriting .history -> "
+        modetc_log_matches(
+          "\[do_fil._open\] rewriting .history -> "
           "/home/alice/var/lib/history"
         )
         machine.succeed("ls /home/alice/var/lib/history")
@@ -187,7 +195,7 @@ test = pkgs.testers.nixosTest {
         machine.succeed("echo debug > /proc/modetc")
         modetc_logs("debugging disabled")
         machine.execute("stat /home/alice/.probe")
-        machine.fail("dmesg | grep -q probe")
+        machine.fail("dmesg | grep -qF .probe")
 
         # debugging on
         machine.succeed("echo debug > /proc/modetc")
