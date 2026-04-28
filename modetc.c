@@ -365,7 +365,7 @@ static struct kprobe probes[] =
   { .symbol_name="vfs_statx",       .pre_handler=handle_filename1 },
   { .symbol_name="filename_create", .pre_handler=handle_filename1 },
   { .symbol_name="filename_lookup", .pre_handler=handle_filename1 },
-  #if LINUX_VERSION_CODE <= KERNEL_VERSION(7, 0, 0)
+  #if LINUX_VERSION_CODE < KERNEL_VERSION(7, 0, 0)
   { .symbol_name="do_unlinkat",     .pre_handler=handle_filename1 },
   { .symbol_name="do_symlinkat",    .pre_handler=handle_filename0 },
   { .symbol_name="do_rmdir",        .pre_handler=handle_filename1 },
