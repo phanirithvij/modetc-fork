@@ -34,6 +34,7 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/file.h>
+#include <linux/slab.h>
 
 /* for function interception */
 #include <linux/kprobes.h>
@@ -131,7 +132,7 @@ static int load_rules(void) {
       if (!comment) nrules++;
       comment = 0;
     }
-    if (nrules > MAX_RULES_SIZE) break;
+    if (nrules >= MAX_RULES) break;
   }
 
   // Print parsed rules
@@ -237,56 +238,85 @@ static char *get_cwd_path(char *buf, size_t len) {
 
 
 /*
- * Overwrites a filepath in buffer of fixed size EMBEDDED_NAME_MAX
+ * Overwrites a filepath in buffer of fixed size MODETC_MAX_PATH
  * following the given rewriting rules
  */
 static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
-  // Skip if any error occurred
-  if (IS_ERR(fname)) {
-    pr_err("getname failed, err=%ld\n", PTR_ERR(fname));
+  // Skip if any error occurred or NULL
+  if (IS_ERR_OR_NULL(fname)) {
+    if (IS_ERR(fname))
+      pr_err("getname failed, err=%ld\n", PTR_ERR(fname));
     return 0;
   }
 
   // Exit immediately when paused
   if (unlikely(paused)) return 0;
 
-  #define EMBEDDED_NAME_MAX (PATH_MAX - offsetof(struct filename, iname))
-  char fname1[EMBEDDED_NAME_MAX];
+  #define MODETC_MAX_PATH PATH_MAX
+  char *fname1 = kmalloc(MODETC_MAX_PATH, GFP_ATOMIC);
+  if (!fname1) return 0;
+
   const char *cursor = fname->name;
 
   // Handle relative paths
   if (unlikely(cursor[0] != '/')) {
     // TODO: handle these, for now skip
-    if (dfd != AT_FDCWD) return 0;
+    if (dfd != AT_FDCWD) {
+      kfree(fname1);
+      return 0;
+    }
 
     // Get the cwd
-    char buf[EMBEDDED_NAME_MAX];
+    char *buf = kmalloc(MODETC_MAX_PATH, GFP_ATOMIC);
+    if (!buf) {
+      kfree(fname1);
+      return 0;
+    }
 
-    char *cwd = get_cwd_path(buf, sizeof(buf));
+    char *cwd = get_cwd_path(buf, MODETC_MAX_PATH);
     if (IS_ERR(cwd)) {
       pr_err("failed to get cwd, err=%ld\n", PTR_ERR(cwd));
       pr_err("could not rewrite %s\n", fname->name);
+      kfree(buf);
+      kfree(fname1);
       return 0;
     }
 
     // cwd is not home, skip
-    if (likely(strcmp(cwd, homedir))) return 0;
+    if (likely(strcmp(cwd, homedir))) {
+      kfree(buf);
+      kfree(fname1);
+      return 0;
+    }
+    kfree(buf);
   } else {
     // Handle absolute paths
 
     // Outside home, skip
-    if (strncmp(cursor, homedir, homedir_len)) return 0;
+    if (strncmp(cursor, homedir, homedir_len)) {
+      kfree(fname1);
+      return 0;
+    }
 
     // Move past the home prefix
     cursor += homedir_len + 1;
   }
 
   // Skip non-dotfiles
-  if (likely(cursor[0] != '.')) return 0;
+  if (likely(cursor[0] != '.')) {
+    kfree(fname1);
+    return 0;
+  }
 
   // Skip special . and .. directories
-  if (unlikely(is_fname_end(cursor[1]))) return 0;
-  if (unlikely(cursor[1] == '.' && is_fname_end(cursor[2]))) return 0;
+  if (unlikely(is_fname_end(cursor[1]))) {
+    kfree(fname1);
+    return 0;
+  }
+  if (unlikely(cursor[1] == '.' && is_fname_end(cursor[2]))) {
+    kfree(fname1);
+    return 0;
+  }
 
   if (debug) pr_info("[%s] intercepted path %s\n", caller, fname->name);
 
@@ -298,7 +328,7 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
 
     if (!strncmp(cursor, r->match, r->len)) {
       cursor += r->len;
-      len = snprintf((char *)fname1, sizeof(fname1), "%s/%s%s",
+      len = snprintf(fname1, MODETC_MAX_PATH, "%s/%s%s",
                      homedir, r->repl, cursor);
       if (debug) pr_info("[%s] path %s matches rule %d\n",
                          caller, fname->name, i);
@@ -310,19 +340,20 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
   if (has_default && i == nrules) {
     // Strip leading dot
     cursor += 1;
-    len = snprintf((char *)fname1, sizeof(fname1), "%s/%s%s",
+    len = snprintf(fname1, MODETC_MAX_PATH, "%s/%s%s",
                           homedir, default_rule, cursor);
     if (debug) pr_info("[%s] default rule for %s\n", caller, fname->name);
   }
 
   // If anything matched and result fits the buffer
-  if (len > 0 && len < EMBEDDED_NAME_MAX) {
+  if (len > 0 && len < MODETC_MAX_PATH) {
     // Overwrite original filename
     if (debug) pr_info("[%s] rewriting %s -> %s\n",
                        caller, fname->name, fname1);
     memcpy((void *)fname->name, fname1, len + 1);
   }
 
+  kfree(fname1);
   return 0;
 }
 
