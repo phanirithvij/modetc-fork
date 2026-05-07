@@ -241,11 +241,8 @@ static char *get_cwd_path(char *buf, size_t len) {
  * following the given rewriting rules
  */
 static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
-  // Skip if any error occurred
-  if (IS_ERR(fname)) {
-    pr_err("getname failed, err=%ld\n", PTR_ERR(fname));
-    return 0;
-  }
+  // Skip invalid pointers
+  if (IS_ERR(fname)) return 0;
 
   // Exit immediately when paused
   if (unlikely(paused)) return 0;
