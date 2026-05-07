@@ -94,7 +94,7 @@ static int load_rules(void) {
   // Open the file
   struct file *file = filp_open(rules_file, O_RDONLY, 0);
   if (IS_ERR(file)) {
-    pr_err("failed to rules file\n");
+    pr_err("failed to open rules file\n");
     return -EIO;
   }
 
@@ -131,7 +131,7 @@ static int load_rules(void) {
       if (!comment) nrules++;
       comment = 0;
     }
-    if (nrules > MAX_RULES_SIZE) break;
+    if (nrules > MAX_RULES) break;
   }
 
   // Print parsed rules
