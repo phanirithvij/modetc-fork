@@ -53,8 +53,6 @@ Note: whitespace is significant and match and replacement are separate by a tab
 character. On a given line, anything after a `#` character is treated as a
 comment. Empty lines are also ignored.
 
-Note: the maximum number of rules supported is 16.
-
 ### Example rules file:
 
 ```

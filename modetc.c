@@ -24,6 +24,12 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
+/* for reading files */
+#include <linux/kernel_read_file.h>
+
+/* for dynamic allocations */
+#include <linux/slab.h>
+
 /* for kernel version macros */
 #include <linux/version.h>
 
@@ -73,65 +79,75 @@ MODULE_PARM_DESC(debug, "Turn on debugging for rewriting rules, default 0");
 
 /* Rules file */
 
-#define MAX_RULES 16
-#define MATCH_SIZE 32
-#define MAX_RULES_SIZE MAX_RULES*(MATCH_SIZE + 1)*2
+#define RULES_BLOCK 16
+#define MATCH_SIZE 64
 
 struct rule {
-  char match[32]; // substring to match
-  size_t len;     // length of match
-  char repl[32];  // replacement
+  char match[MATCH_SIZE]; // substring to match
+  size_t len;             // length of match
+  char repl[MATCH_SIZE];  // replacement
 };
 
-static struct rule rules[MAX_RULES];
+static struct rule *rules = NULL;
 static int nrules = 0;
 
 
 static int load_rules(void) {
-  char buffer[MAX_RULES_SIZE];
-  loff_t pos = 0;
-
-  // Open the file
-  struct file *file = filp_open(rules_file, O_RDONLY, 0);
-  if (IS_ERR(file)) {
-    pr_err("failed to open rules file\n");
-    return -EIO;
-  }
-
-  // Read all file into buffer
-  int count = kernel_read(file, buffer, sizeof(buffer), &pos);
-  if (count < 0) {
+  // Read the entire file into a buffer
+  void *vbuf = NULL;
+  int len = kernel_read_file_from_path(rules_file, 0, &vbuf, INT_MAX,
+                                       NULL, READING_POLICY);
+  char * buffer = (char *)vbuf;
+  if (len < 0) {
     pr_err("failed to read rules file\n");
-    filp_close(file, NULL);
-    return count;
+    return len;
   }
-  filp_close(file, NULL);
+
+  // Clean up when reloading
+  if (rules != NULL) {
+    nrules = 0;
+    kfree(rules);
+  }
+
+  // Allocate one block of rules
+  rules = kmalloc(RULES_BLOCK * sizeof(struct rule), GFP_KERNEL);
 
   // Parse the rules file
-  nrules = 0;
   int comment = 0;
   loff_t start = 0;
-  for (int pos = 0; pos < count; pos++) {
+  for (int pos = 0; pos < len; pos++) {
     // Start of comment
     if (!comment) {
       comment = buffer[pos] == '#' && (pos > 0? buffer[pos-1] == '\n' : 1);
     }
+
     // End of match string
     if (!comment && buffer[pos] == '\t') {
+      // Extend the array if necessary
+      if (nrules > 0 && nrules % RULES_BLOCK == 0) {
+        struct rule *tmp;
+        tmp = kmalloc((nrules + RULES_BLOCK) * sizeof(struct rule), GFP_KERNEL);
+        memcpy(tmp, rules, nrules * sizeof(struct rule));
+        kfree(rules);
+        rules = tmp;
+      }
+
       size_t len = pos - start;
       snprintf(rules[nrules].match, min(MATCH_SIZE, len+1), "%s", buffer+start);
       rules[nrules].len = len;
       start = pos + 1;
     }
+
     // End of replacement string
     if (buffer[pos] == '\n' && pos != start) {
       int len = pos - start;
       snprintf(rules[nrules].repl, min(MATCH_SIZE, len+1), "%s", buffer+start);
       start = pos + 1;
+
+      // Parsed one rule
       if (!comment) nrules++;
       comment = 0;
     }
-    if (nrules > MAX_RULES) break;
   }
 
   // Print parsed rules
