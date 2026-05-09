@@ -85,6 +85,18 @@ test = pkgs.testers.nixosTest {
       .config/	etc/
       .local/state/	var/lib/
       .cache/	var/cache/
+
+      # Some padding for testing >16 rules
+      rule-match-0/	rule-repl-0
+      rule-match-1/	rule-repl-1
+      rule-match-2/	rule-repl-2
+      rule-match-3/	rule-repl-3
+      rule-match-4/	rule-repl-4
+      rule-match-5/	rule-repl-5
+      rule-match-6/	rule-repl-6
+      rule-match-7/	rule-repl-7
+      rule-match-8/	rule-repl-8
+      rule-match-9/	rule-repl-9
     '';
   };
   testScript = ''
@@ -116,7 +128,7 @@ test = pkgs.testers.nixosTest {
     with subtest("Module reloading works"):
         machine.execute("echo reload > /proc/modetc")
         modetc_logs("reloading")
-        modetc_logs("13 rules loaded")
+        modetc_logs("23 rules loaded")
 
     with subtest("Filename interception is working"):
         machine.wait_for_unit("home.mount")
@@ -180,6 +192,11 @@ test = pkgs.testers.nixosTest {
           "/home/alice/var/lib/history"
         )
         machine.succeed("ls /home/alice/var/lib/history")
+
+    with subtest("Long filenames are handled correctly"):
+        long = "l" + "o"*180 + "ng"
+        machine.succeed(f"touch /home/alice/.{long}")
+        machine.succeed(f"stat /home/alice/var/lib/{long}")
 
     with subtest("Can pause and resume rewriting"):
         machine.succeed("echo pause > /proc/modetc")

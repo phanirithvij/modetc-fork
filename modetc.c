@@ -253,18 +253,15 @@ static char *get_cwd_path(char *buf, size_t len) {
 
 
 /*
- * Overwrites a filepath in buffer of fixed size EMBEDDED_NAME_MAX
- * following the given rewriting rules
+ * Overwrites a filepath in buffer following the given rewriting rules
  */
 static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
   // Skip invalid pointers
-  if (IS_ERR(fname)) return 0;
+  if (IS_ERR_OR_NULL(fname)) return 0;
 
   // Exit immediately when paused
   if (unlikely(paused)) return 0;
 
-  #define EMBEDDED_NAME_MAX (PATH_MAX - offsetof(struct filename, iname))
-  char fname1[EMBEDDED_NAME_MAX];
   const char *cursor = fname->name;
 
   // Handle relative paths
@@ -273,8 +270,7 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
     if (dfd != AT_FDCWD) return 0;
 
     // Get the cwd
-    char buf[EMBEDDED_NAME_MAX];
-
+    char buf[128];
     char *cwd = get_cwd_path(buf, sizeof(buf));
     if (IS_ERR(cwd)) {
       pr_err("failed to get cwd, err=%ld\n", PTR_ERR(cwd));
@@ -303,6 +299,9 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
 
   if (debug) pr_info("[%s] intercepted path %s\n", caller, fname->name);
 
+  // Allocate a temporary buffer
+  char *buf = kmalloc(PATH_MAX, GFP_KERNEL);
+
   // Replace with rules
   size_t len = 0;
   int i;
@@ -310,8 +309,10 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
     const struct rule *r = &rules[i];
 
     if (!strncmp(cursor, r->match, r->len)) {
+      pr_err("rule[0].match = %s", rules[0].match);
+      pr_err("rule[0].repl = %s", rules[0].repl);
       cursor += r->len;
-      len = snprintf((char *)fname1, sizeof(fname1), "%s/%s%s",
+      len = snprintf((char *)buf, PATH_MAX, "%s/%s%s",
                      homedir, r->repl, cursor);
       if (debug) pr_info("[%s] path %s matches rule %d\n",
                          caller, fname->name, i);
@@ -323,18 +324,18 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
   if (has_default && i == nrules) {
     // Strip leading dot
     cursor += 1;
-    len = snprintf((char *)fname1, sizeof(fname1), "%s/%s%s",
-                          homedir, default_rule, cursor);
+    len = snprintf(buf, PATH_MAX, "%s/%s%s", homedir, default_rule, cursor);
     if (debug) pr_info("[%s] default rule for %s\n", caller, fname->name);
   }
 
   // If anything matched and result fits the buffer
-  if (len > 0 && len < EMBEDDED_NAME_MAX) {
+  if (len > 0 && len < PATH_MAX) {
     // Overwrite original filename
-    if (debug) pr_info("[%s] rewriting %s -> %s\n",
-                       caller, fname->name, fname1);
-    memcpy((void *)fname->name, fname1, len + 1);
+    if (debug) pr_info("[%s] rewriting %s -> %s\n", caller, fname->name, buf);
+    memcpy((void *)fname->name, buf, len + 1);
   }
+
+  kfree(buf);
 
   return 0;
 }
