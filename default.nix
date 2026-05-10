@@ -154,7 +154,8 @@ test = pkgs.testers.nixosTest {
 
         # absolute under, but not home
         machine.succeed("touch /home/alice/repo/.gitignore")
-        machine.fail("dmesg | grep -qF '.gitignore'")
+        modetc_log_matches("\[do_fil._open\] intercepted path /home/alice/repo/.gitignore")
+        machine.fail("dmesg | grep -qF 'default rule for .gitignore'")
 
         # specials
         machine.execute("cd /home/alice; ls ./hello")
@@ -192,6 +193,15 @@ test = pkgs.testers.nixosTest {
           "/home/alice/var/lib/history"
         )
         machine.succeed("ls /home/alice/var/lib/history")
+
+        # non-dotfiles
+        machine.succeed("mkdir /home/alice/var/cache/qt")
+        machine.succeed("cd /home/alice; touch etc/Trolltech.conf")
+        modetc_log_matches(
+          "\[do_fil._open\] rewriting etc/Trolltech.conf -> "
+          "/home/alice/var/cache/qt/cache"
+        )
+        machine.succeed("ls /home/alice/var/cache/qt/cache")
 
     with subtest("Long filenames are handled correctly"):
         long = "l" + "o"*180 + "ng"

@@ -290,9 +290,6 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
     cursor += homedir_len + 1;
   }
 
-  // Skip non-dotfiles
-  if (likely(cursor[0] != '.')) return 0;
-
   // Skip special . and .. directories
   if (unlikely(is_fname_end(cursor[1]))) return 0;
   if (unlikely(cursor[1] == '.' && is_fname_end(cursor[2]))) return 0;
@@ -308,9 +305,7 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
   for (i = 0; i < nrules; i++) {
     const struct rule *r = &rules[i];
 
-    if (!strncmp(cursor, r->match, r->len)) {
-      pr_err("rule[0].match = %s", rules[0].match);
-      pr_err("rule[0].repl = %s", rules[0].repl);
+    if (unlikely(!strncmp(cursor, r->match, r->len))) {
       cursor += r->len;
       len = snprintf((char *)buf, PATH_MAX, "%s/%s%s",
                      homedir, r->repl, cursor);
@@ -320,8 +315,8 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
     }
   }
 
-  // Default rule
-  if (has_default && i == nrules) {
+  // Default rule for dotfiles
+  if (has_default && cursor[0] == '.' && i == nrules) {
     // Strip leading dot
     cursor += 1;
     len = snprintf(buf, PATH_MAX, "%s/%s%s", homedir, default_rule, cursor);
