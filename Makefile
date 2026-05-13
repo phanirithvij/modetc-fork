@@ -1,6 +1,6 @@
 obj-m += modetc.o
-KERNEL_DIR ?= /lib/modules/$(shell uname -a)/build
-INSTALL_MOD_DIR ?= /lib/modules/$(shell uname -a)/misc
+KERNEL_DIR ?= /usr/lib/modules/$(shell uname -r)/build
+INSTALL_MOD_DIR ?= /usr/lib/modules/$(shell uname -r)/misc
 
 all:
 	make -C $(KERNEL_DIR) M=$(PWD) modules
