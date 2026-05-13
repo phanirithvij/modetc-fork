@@ -53,6 +53,7 @@ test = pkgs.testers.nixosTest {
       options modetc homedir=/home/alice default_rule=var/lib/ debug=1
     '';
 
+    virtualisation.cores = 2;
     virtualisation.emptyDiskImages = [ 1 ];
     virtualisation.fileSystems."/home" = {
       device = "/dev/vdb";
@@ -193,6 +194,24 @@ test = pkgs.testers.nixosTest {
           "/home/alice/var/lib/history"
         )
         machine.succeed("ls /home/alice/var/lib/history")
+
+        # check concurrency
+        machine.succeed("""
+            sh -ec '
+              worker() {
+                cd /home/alice
+                for i in $(seq 50); do
+                  touch ".$1"
+                  ls ".$1"
+                  rm ".$1"
+                done
+              }
+              worker a &
+              worker b &
+            '
+        """)
+        machine.fail("journalctl -k | grep -q 'rewriting .b -> /home/alice/var/lib/a'")
+        machine.fail("journalctl -k | grep -q 'rewriting .a -> /home/alice/var/lib/b'")
 
         # non-dotfiles
         machine.succeed("mkdir /home/alice/var/cache/qt")

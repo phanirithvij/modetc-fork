@@ -77,6 +77,16 @@ module_param(debug, int, 0660);
 MODULE_PARM_DESC(debug, "Turn on debugging for rewriting rules, default 0");
 
 
+/* Workspace for path manipulations */
+
+/* Note: multiple kprobe handlers can run concurrently, so it's
+ * not safe to use a shared heap buffer and the stack is too small.
+ * Each kprobe should runs on a single CPU with preemption disabled,
+ * though, so it can be given a per-CPU variable.
+ */
+static DEFINE_PER_CPU(char, workspace[PATH_MAX]) __aligned(PATH_MAX);
+
+
 /* Rules file */
 
 #define RULES_BLOCK 16
@@ -270,16 +280,19 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
     if (dfd != AT_FDCWD) return 0;
 
     // Get the cwd
-    char buf[128];
-    char *cwd = get_cwd_path(buf, sizeof(buf));
+    char *buf = get_cpu_ptr(workspace);
+    char *cwd = get_cwd_path(buf, PATH_MAX);
     if (IS_ERR(cwd)) {
       pr_err("failed to get cwd, err=%ld\n", PTR_ERR(cwd));
       pr_err("could not rewrite %s\n", fname->name);
       return 0;
     }
 
+    int elsewhere = strcmp(cwd, homedir);
+    put_cpu_ptr(workspace);
+
     // cwd is not home, skip
-    if (likely(strcmp(cwd, homedir))) return 0;
+    if (likely(elsewhere)) return 0;
   } else {
     // Handle absolute paths
 
@@ -296,10 +309,8 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
 
   if (debug) pr_info("[%s] intercepted path %s\n", caller, fname->name);
 
-  // Allocate a temporary buffer
-  char *buf = kmalloc(PATH_MAX, GFP_KERNEL);
-
   // Replace with rules
+  char *buf = get_cpu_ptr(workspace);
   size_t len = 0;
   int i;
   for (i = 0; i < nrules; i++) {
@@ -330,7 +341,8 @@ static int do_rewrite(const char *caller, int dfd, struct filename *fname) {
     memcpy((void *)fname->name, buf, len + 1);
   }
 
-  kfree(buf);
+  // Release workspace
+  put_cpu_ptr(workspace);
 
   return 0;
 }
