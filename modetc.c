@@ -451,6 +451,7 @@ static void __exit modetc_cleanup(void)
   for (int i = 0; i < ARRAY_SIZE(probes); i++) {
     unregister_kprobe(&probes[i]);
   }
+  kfree(rules);
   pr_info("stopped\n");
 }
 

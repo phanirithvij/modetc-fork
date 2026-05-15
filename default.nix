@@ -313,6 +313,7 @@ test = pkgs.testers.nixosTest {
     with subtest("Can unload the module"):
         machine.succeed("rmmod modetc")
         modetc_logs("stopped")
+        machine.fail("journalctl -k --grep 'allocated at module unload'")
 
     with subtest("Can reload with different settings"):
         machine.succeed("rm /etc/modprobe.d/nixos.conf")
