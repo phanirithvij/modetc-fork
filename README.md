@@ -31,7 +31,7 @@ loading the module (eg. `modprobe modetc homedir=...`) or by adding a line to
 ## Rewriting rules
 
 modetc rules are pure text search and replace: single substitution per file
-path, no wildcards nor regular expresssions.
+path, no wildcards nor regular expressions.
 
 The rules are only applied to absolute path with the `homedir` prefix followed
 by `.`, or to any relative path with a leading `.` when the working directory
@@ -106,7 +106,7 @@ sudo insmod result/lib/modules/*/misc/modetc.ko
 Note: when using a custom or older kernel, you may have to change the
 `linux` argument in the Nix expression (`default.nix`) to match yours.
 
-Otherwise, install a basic toolchain and linux kernel module and run
+Otherwise, install a basic toolchain and Linux kernel module and run
 `make` to build the module.
 
 
@@ -192,6 +192,31 @@ Similarly to both method, modetc is Linux-specific.
 [libetc]: https://ordiluc.net/fs/libetc/README
 [rewritefs]: https://github.com/sloonz/rewritefs
 [FUSE]: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
+
+
+## Performance
+
+modetc should have very little impact on performance.
+The kprobes currently used to implement the rewriting are inserted at static
+tracepoints, so they called using a simple `jump` and don't need an expensive
+CPU trap.
+The code doesn't make memory allocation (each CPU has its own statically
+allocated buffer); matching is based on fixed-length string comparisons; it's
+optimised to return as soon as possible for non-matching filenames.
+
+For a quick benchmark we measure the time to checkout release branches 6 months
+apart in the [Nixpkgs] monorepo[^1]:
+
+|                    | Minimum / ms | Average / ms | Deviation / ms |
+|:-------------------|-------------:|-------------:|---------------:|
+| modetc unloaded    |         2482 |         2652 |            219 |
+| rewriting paused   |         2352 |         2748 |            234 |
+| rewriting enabled  |         2519 |         2788 |            205 |
+
+
+[^1]: 50k files, 35k directories, ~6GB of git history.
+
+[nixpkgs]: https://github.com/NixOS/nixpkgs
 
 
 ## License
