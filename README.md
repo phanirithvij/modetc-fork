@@ -106,7 +106,7 @@ sudo insmod result/lib/modules/*/misc/modetc.ko
 Note: when using a custom or older kernel, you may have to change the
 `linux` argument in the Nix expression (`default.nix`) to match yours.
 
-Otherwise, install a basic toolchain and Linux kernel module and run
+Otherwise, install a basic toolchain, Linux kernel headers and run
 `make` to build the module.
 
 

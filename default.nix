@@ -15,10 +15,10 @@ module = pkgs.stdenv.mkDerivation {
   hardeningDisable = [ "pic" "format" ];
   nativeBuildInputs = linux.kernel.moduleBuildDependencies;
 
-  makeFlags = [
+  makeFlags = linux.kernelModuleMakeFlags ++ [
     "KERNELRELEASE=${linux.kernel.modDirVersion}"
     "KERNEL_DIR=${linux.kernel.dev}/lib/modules/${linux.kernel.modDirVersion}/build"
-    "INSTALL_MOD_DIR=$(out)/lib/modules/${linux.kernel.modDirVersion}/misc/"
+    "INSTALL_MOD_PATH=$(out)"
   ];
 
   meta = with pkgs.lib; {
